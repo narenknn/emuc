@@ -1,3 +1,4 @@
 module load boost/1.63.0
-GCC : /tool/pandora64/hdk-6/1.1/bin/gcc
-
+module load cmake/3.12.3
+export CC=/tool/pandora64/hdk-6/1.1/bin/gcc
+export CXX=/tool/pandora64/hdk-6/1.1/bin/g++

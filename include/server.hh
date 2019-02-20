@@ -1,28 +1,72 @@
-//
-// chat_server.cpp
-// ~~~~~~~~~~~~~~~
-//
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
-//
-// Distributed under the Boost Software License, Version 1.0. (See accompanying
-// file LICENSE_1_0.txt or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">http://www.boost.org/LICENSE_1_0.txt</a>)
-//
+#pragma once
 
-#include <cstdlib>
-#include <deque>
-#include <iostream>
-#include <list>
-#include <memory>
-#include <set>
-#include <utility>
-#include <unordered_map>
-#include <boost/asio.hpp>
+#define EMUC_SERVER_HH
 
-#include "server.hh"
+#ifdef EMUC_CLIENT_HH
+#error "Include either server.hh or client.hh!"
+#endif
 
+//----------------------------------------------------------------------
 using boost::asio::ip::tcp;
+class Connection;
 
-Connection connection;
+//----------------------------------------------------------------------
+class Consumer
+{
+public:
+  std::uint32_t pipeId, tranSz;
+  virtual char* getWrPtr() = 0;
+  virtual std::uint32_t getWrPtrSz() { return sizeof(pipeId) + tranSz; }
+  virtual void receive(char *d) = 0;
+  Consumer(std::uint32_t p, std::uint32_t tsz) :
+    pipeId(p), tranSz(tsz)
+  {}
+};
+
+//----------------------------------------------------------------------
+class Pipe
+{
+public:
+  std::uint32_t pipeId, tranSz;
+  std::unique_ptr<char[]> _data;
+  std::vector<Consumer *> _consumers;
+  void addConsumer(Consumer* c)
+  {
+    _consumers.emplace_back(c);
+  }
+
+  void receive()
+  {
+    std::cout << "in Pipe::receive()\n";
+    for (auto& consumer: _consumers)
+      consumer->receive(_data.get());
+  }
+
+  Pipe(std::uint32_t p, std::uint32_t tz) :
+    pipeId(p), tranSz(tz), _data{new char[tz]} {
+  }
+};
+
+class Connection
+{
+public:
+  std::unordered_map<std::uint32_t, std::unique_ptr<Pipe>> pipes;
+  void addConsumer(Consumer* c)
+  {
+    if (pipes.end() == pipes.find(c->pipeId))
+      pipes.emplace(c->pipeId, std::make_unique<Pipe>(c->pipeId, c->tranSz));
+    pipes[c->pipeId]->addConsumer(c);
+  }
+  std::uint32_t getTranSz(std::uint32_t pipeId)
+  {
+    if (pipes.end() == pipes.find(pipeId))
+      return 0;
+    return pipes[pipeId]->tranSz;
+  }
+  void write(Consumer *c);
+};
+
+extern Connection connection;
 
 //----------------------------------------------------------------------
 class SocketServer : public std::enable_shared_from_this<SocketServer>
@@ -115,14 +159,6 @@ private:
   tcp::socket socket_;
   std::deque<Consumer *> write_msgs_;
 };
-SocketServer* SocketServer::ss = nullptr;
-
-void
-Connection::write(Consumer *c)
-{
-  if (SocketServer::ss)
-    SocketServer::ss->write(c);
-}
 
 //----------------------------------------------------------------------
 class Server
@@ -154,50 +190,3 @@ private:
   tcp::acceptor acceptor_;
   tcp::socket socket_;
 };
-
-//----------------------------------------------------------------------
-
-class tempConsumer : public Consumer
-{
-public:
-  std::unique_ptr<char[]> _data;
-  tempConsumer() : Consumer(0, 14), _data{std::make_unique<char[]>(20)} {
-    strncpy(_data.get(), "abHello World!1\n", 16);
-  }
-  char* getWrPtr() { return _data.get(); }
-  void receive(char *d)
-  {
-    std::cout << "Server Obtained: " << std::string{d, 14} << "\n";
-  }
-};
-
-int main(int argc, char* argv[])
-{
-  try
-  {
-    if (argc < 2)
-    {
-      std::cerr << "Usage: server <port> [<port> ...]\n";
-      return 1;
-    }
-
-    boost::asio::io_service io_service;
-
-    std::list<Server> servers;
-    for (int i = 1; i < argc; ++i)
-    {
-      tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[i]));
-      servers.emplace_back(io_service, endpoint);
-    }
-
-    tempConsumer t;
-    connection.addConsumer(&t);
-    io_service.run();
-  }
-  catch (std::exception& e)
-  {
-    std::cerr << "Exception: " << e.what() << "\n";
-  }
-
-  return 0;
-}

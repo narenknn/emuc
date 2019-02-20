@@ -1,24 +1,72 @@
-//
-// chat_client.cpp
-// ~~~~~~~~~~~~~~~
-//
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
-//
-// Distributed under the Boost Software License, Version 1.0. (See accompanying
-// file LICENSE_1_0.txt or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">http://www.boost.org/LICENSE_1_0.txt</a>)
-//
+#pragma once
 
-#include <cstdlib>
-#include <deque>
-#include <iostream>
-#include <thread>
-#include <unordered_map>
-#include <boost/asio.hpp>
-#include "client.hh"
+#define EMUC_CLIENT_HH
 
+#ifdef EMUC_SERVER_HH
+#error "Include either server.hh or client.hh!"
+#endif
+
+//----------------------------------------------------------------------
 using boost::asio::ip::tcp;
+class Connection;
 
-Connection connection;
+//----------------------------------------------------------------------
+class Consumer
+{
+public:
+  std::uint32_t pipeId, tranSz;
+  virtual char* getWrPtr() = 0;
+  virtual std::uint32_t getWrPtrSz() { return sizeof(pipeId) + tranSz; }
+  virtual void receive(char *d) = 0;
+  Consumer(std::uint32_t p, std::uint32_t tsz) :
+    pipeId(p), tranSz(tsz)
+  {}
+};
+
+//----------------------------------------------------------------------
+class Pipe
+{
+public:
+  std::uint32_t pipeId, tranSz;
+  std::unique_ptr<char[]> _data;
+  std::vector<Consumer *> _consumers;
+  void addConsumer(Consumer* c)
+  {
+    _consumers.emplace_back(c);
+  }
+
+  void receive()
+  {
+    for (auto& consumer: _consumers)
+      consumer->receive(_data.get());
+  }
+
+  Pipe(std::uint32_t p, std::uint32_t tz) :
+    pipeId(p), tranSz(tz), _data{std::make_unique<char[]>(tz)} {
+  }
+};
+
+//----------------------------------------------------------------------
+class Connection
+{
+public:
+  std::unordered_map<std::uint32_t, std::unique_ptr<Pipe>> pipes;
+  void addConsumer(Consumer* c)
+  {
+    if (pipes.end() == pipes.find(c->pipeId))
+      pipes.emplace(c->pipeId, std::make_unique<Pipe>(c->pipeId, c->tranSz));
+    pipes[c->pipeId]->addConsumer(c);
+  }
+  std::uint32_t getTranSz(std::uint32_t pipeId)
+  {
+    if (pipes.end() == pipes.find(pipeId))
+      return 0;
+    return pipes[pipeId]->tranSz;
+  }
+  void write(Consumer *c);
+};
+
+extern Connection connection;
 
 class SocketClient
 {
@@ -127,70 +175,3 @@ private:
   tcp::socket socket_;
   std::deque<Consumer *> write_msgs_;
 };
-SocketClient* SocketClient::sc = nullptr;
-
-void
-Connection::write(Consumer *c)
-{
-  if (SocketClient::sc)
-    SocketClient::sc->write(c);
-}
-
-class tempConsumer : public Consumer
-{
-public:
-  std::unique_ptr<char[]> _data;
-  tempConsumer() : Consumer(0, 14), _data{std::make_unique<char[]>(20)} {
-    strncpy(_data.get(), "\1\0\0\0cdHello World!1\n", 18);
-  }
-  char* getWrPtr() { return _data.get(); }
-  void receive(char *d)
-  {
-    std::cout << "Client Obtained: " << std::string{d, 14};
-  }
-};
-
-int main(int argc, char* argv[])
-{
-  try
-  {
-    if (argc != 3)
-    {
-      std::cerr << "Usage: SocketClient <host> <port>\n";
-      return 1;
-    }
-
-    boost::asio::io_service io_service;
-
-    tcp::resolver resolver(io_service);
-    auto endpoint_iterator = resolver.resolve({ argv[1], argv[2] });
-    SocketClient c(io_service, endpoint_iterator);
-
-    std::thread t([&io_service](){ io_service.run(); });
-
-//    char line[message::max_body_length + 1];
-//    std::cout << "before cin.getline loop\n";
-//    while (std::cin.getline(line, message::max_body_length + 1))
-//    {
-//      message msg;
-//      msg.body_length(std::strlen(line));
-//      std::memcpy(msg.body(), line, msg.body_length());
-//      msg.encode_header();
-//      c.write(msg);
-//      std::cout << "in cin.getline loop\n";
-//    }
-
-    tempConsumer tc;
-    connection.addConsumer(&tc);
-    connection.write(&tc);
-
-    c.close();
-    t.join();
-  }
-  catch (std::exception& e)
-  {
-    std::cerr << "Exception: " << e.what() << "\n";
-  }
-
-  return 0;
-}
