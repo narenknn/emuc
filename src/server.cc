@@ -16,11 +16,11 @@
 
 Connection connection;
 
-SocketServer* SocketServer::ss = nullptr;
+std::shared_ptr<SocketServer> ss;
 
 void
 Connection::write(Consumer *c)
 {
-  if (SocketServer::ss)
-    SocketServer::ss->write(c);
+  if (ss)
+    ss->write(c);
 }

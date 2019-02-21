@@ -43,7 +43,7 @@ public:
   }
 
   Pipe(std::uint32_t p, std::uint32_t tz) :
-    pipeId(p), tranSz(tz), _data{new char[tz]} {
+    pipeId(p), tranSz(tz), _data{std::make_unique<char[]>(tz)} {
   }
 };
 
@@ -72,11 +72,9 @@ extern Connection connection;
 class SocketServer : public std::enable_shared_from_this<SocketServer>
 {
 public:
-  static SocketServer* ss;
   SocketServer(tcp::socket socket)
     : socket_(std::move(socket))
   {
-    ss = this;
   }
 
   void start()
@@ -159,6 +157,7 @@ private:
   tcp::socket socket_;
   std::deque<Consumer *> write_msgs_;
 };
+extern std::shared_ptr<SocketServer> ss;
 
 //----------------------------------------------------------------------
 class Server
@@ -180,7 +179,8 @@ private:
         {
           if (!ec)
           {
-            std::make_shared<SocketServer>(std::move(socket_))->start();
+            ss = std::make_shared<SocketServer>(std::move(socket_));
+            ss->start();
           }
 
           do_accept();

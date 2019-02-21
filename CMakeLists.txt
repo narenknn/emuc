@@ -4,10 +4,10 @@ project (EMUC)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library (emucClient STATIC csrc/client.cc)
+add_library (emucClient STATIC src/client.cc)
 target_include_directories (emucClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include $ENV{BOOST_HOME}/include)
 
-add_library (emucServer STATIC csrc/server.cc)
+add_library (emucServer STATIC src/server.cc)
 target_include_directories (emucServer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include $ENV{BOOST_HOME}/include)
 
 add_executable (client tests/client_hw.cc)

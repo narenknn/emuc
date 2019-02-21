@@ -164,7 +164,7 @@ private:
           }
           else
           {
-            std::cerr << "SocketClient : Failed during write\n";
+            std::cerr << "SocketClient : Failed during write (" << ec << ")\n";
           }
         });
   }

@@ -9,15 +9,16 @@ class tempConsumer : public Consumer
 {
 public:
   std::unique_ptr<char[]> _data;
-  tempConsumer() : Consumer(0, 14), _data{std::make_unique<char[]>(20)} {
+  tempConsumer() : Consumer(0, 16), _data{std::make_unique<char[]>(20)} {
     strncpy(_data.get(), "\1\0\0\0cdHello World!1\n", 18);
   }
   char* getWrPtr() { return _data.get(); }
   void receive(char *d)
   {
-    std::cout << "Client Obtained: " << std::string{d, 14};
+    std::cout << "Client Obtained: " << std::string{d, 16};
   }
 };
+tempConsumer tc;
 
 int main(int argc, char* argv[])
 {
@@ -49,9 +50,10 @@ int main(int argc, char* argv[])
 //      std::cout << "in cin.getline loop\n";
 //    }
 
-    tempConsumer tc;
     connection.addConsumer(&tc);
     connection.write(&tc);
+
+    sleep(1);
 
     c.close();
     t.join();
