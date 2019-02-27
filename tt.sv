@@ -53,14 +53,10 @@ module tt;
 
    initial begin
       initFunc();
-      $display("finish of initFunc block");
-   end
-   initial begin
-      repeat(100) begin
+      forever begin
          @(posedge clk);
          pollOnce();
       end
-      $display("Finish of poll block");
       $finish;
    end
 

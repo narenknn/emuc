@@ -1,24 +1,54 @@
-#include <deque>
+#include <queue>
 #include <iostream>
 #include <unordered_map>
 #include <boost/asio.hpp>
-#include "client.hh"
 #include <thread>
+#include "client.hh"
 
-class tempConsumer : public Consumer
-{
+#include <cstring>
+
+#include "svbit.hh"
+#include "shash.hh"
+
+class SdpReqBus : public TransBase {
 public:
-  std::unique_ptr<char[]> _data;
-  tempConsumer() : Consumer(0, 16), _data{std::make_unique<char[]>(20)} {
-    strncpy(_data.get(), "\1\0\0\0cdHello World!1\n", 18);
+  std::uint32_t* const _dptr;
+  svBitTp<64> addr{_dptr};
+  svBitTp<64> data{_dptr+SV_SIZE(64)};
+  static constexpr std::size_t
+  DATA_U32_SZ() { return SV_SIZE(64)+SV_SIZE(64); }
+  static constexpr std::size_t
+  DATA_U8_SZ() { return DATA_U32_SZ()*sizeof(std::uint32_t); }
+  SdpReqBus(): TransBase{DATA_U8_SZ()},
+    _dptr{(std::uint32_t*)(((char *)_data.get())+sizeof(std::uint32_t))} {
   }
-  char* getWrPtr() { return _data.get(); }
-  void receive(char *d)
-  {
-    std::cout << "Client Obtained: " << std::string{d, 16};
+  SdpReqBus(char *_d): TransBase{DATA_U8_SZ()},
+    _dptr{(std::uint32_t*)(((char *)_data.get())+sizeof(std::uint32_t))} {
+      std::memcpy(_dptr, _d, DATA_U8_SZ());
+  }
+  SdpReqBus& operator=(SdpReqBus& o) {
+    std::memcpy(_dptr, o._dptr, DATA_U8_SZ());
   }
 };
-tempConsumer tc;
+
+template<std::uint32_t PipeId, class Bus>
+class EmuTransactor : public Pipe
+{
+public:
+  EmuTransactor() : Pipe{PipeId, Bus::DATA_U8_SZ()}
+  { }
+  void send(std::shared_ptr<TransBase> p)
+  {
+    *(p->pipeId) = PipeId;
+    rawSend(p);
+  }
+  void receive(char *)
+  {
+    //Bus{_recvdata.get()};
+    std::cout << "Client Obtained transaction\n";
+  }
+};
+EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 
 int main(int argc, char* argv[])
 {
@@ -38,20 +68,8 @@ int main(int argc, char* argv[])
 
     std::thread t([&io_service](){ io_service.run(); });
 
-//    char line[message::max_body_length + 1];
-//    std::cout << "before cin.getline loop\n";
-//    while (std::cin.getline(line, message::max_body_length + 1))
-//    {
-//      message msg;
-//      msg.body_length(std::strlen(line));
-//      std::memcpy(msg.body(), line, msg.body_length());
-//      msg.encode_header();
-//      c.write(msg);
-//      std::cout << "in cin.getline loop\n";
-//    }
-
-    connection.addConsumer(&tc);
-    connection.write(&tc);
+    std::shared_ptr<SdpReqBus> v1{std::make_shared<SdpReqBus>()};
+    trans.send(v1);
 
     sleep(1);
 

@@ -2,3 +2,5 @@ module load boost/1.63.0
 module load cmake/3.12.3
 export CC=/tool/pandora64/hdk-6/1.1/bin/gcc
 export CXX=/tool/pandora64/hdk-6/1.1/bin/g++
+
+## \rm -rf csrc simv* ; vcs -full64 -debug_pp -sverilog tt.sv tt.cc -CFLAGS "-I $BOOST_HOME/include -I ../include " /proj/df_verif_scratch3/naren/zp/emuc/build/libemucServer.a $BOOST_HOME/lib/libboost_filesystem.a ${BOOST_HOME}/lib/libboost_system.a

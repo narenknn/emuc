@@ -1,67 +1,34 @@
-template<std::uint32_t S> struct svBitT;
+#include "svdpi.h"
+
+/* How many 32-bit locations required to store this ? */
+constexpr std::size_t SV_SIZE(std::size_t size)
+{ return SV_CANONICAL_SIZE(size); }
 
 template<std::uint32_t S>
 struct svBitTp {
 public:
-  svBitVec32 *Value;
+  svBitVec32* const Value;
   svBitTp() = delete;
   svBitTp(svBitVec32 *v) : Value(v) {}
 
-  svBitTp& operator=(const svBitT<S> &o) {
-    for (uint32_t ui1=SV_CANONICAL_SIZE(S); ui1;) {
-      ui1--;
-      Value[ui1] = o.Value[ui1];
-    }
-  }
-};
-
-template<std::uint32_t S>
-struct svBitT {
-public:
-  svBitVec32 Value[SV_CANONICAL_SIZE(S)];
-
   /* Type conversions */
   operator uint64_t();
-  operator svBitVec32*();
   operator std::string();
 
-  /* Assignments */
-  svBitT<S>(const char *rhs);
-  svBitT<S>();
+  svBitTp<S>& operator=(const svBitTp<S> &o) {
+    std::memcpy(Value, o.Value, SV_SIZE(S)*sizeof(std::uint32_t));
+    return *this;
+  }
+  svBitTp<S>& operator=(const std::string& rhs);
+  svBitTp<S>& operator=(const std::uint64_t rhs);
 };
 
 template<std::uint32_t S>
-svBitT<S>::svBitT()
-{
-  for (uint32_t ui1=SV_CANONICAL_SIZE(S); ui1; ui1--) {
-    Value[ui1-1] = 0;
-  }
-}
-
-template<std::uint32_t S>
-svBitT<S>::operator svBitVec32*()
-{
-  return Value;
-}
-
-template<std::uint32_t S>
-svBitT<S>::operator uint64_t()
-{
-  uint64_t ret = 0;
-  if (SV_CANONICAL_SIZE(S) > 1) {
-    ret = Value[1];
-    ret <<= (sizeof(svBitVec32)<<3);
-  }
-  ret |= Value[0];
-  return ret;
-}
-
-template<std::uint32_t S>
-svBitT<S>::operator std::string()
+svBitTp<S>::operator std::string()
 {
   static const char int2hex[] {"0123456789ABCDEF"};
   std::string ret;
-  for (std::uint32_t ui1=SV_CANONICAL_SIZE(S); ui1; ) {
+  for (std::uint32_t ui1=SV_SIZE(S); ui1; ) {
     ui1--;
     ret+=int2hex[(Value[ui1]>>28) & 0xF];
     ret+=int2hex[(Value[ui1]>>24) & 0xF];
@@ -77,17 +44,15 @@ svBitT<S>::operator std::string()
 }
 
 template<std::uint32_t S>
-svBitT<S>::svBitT(const char* rhs)
-  : svBitT()
+svBitTp<S>& svBitTp<S>::operator=(const std::string& rhs)
 {
-  std::string srhs{rhs};
   std::uint32_t idx = 0;
-  for (auto c=srhs.rbegin(); c!=srhs.rend(); ) {
+  for (auto c=rhs.rbegin(); c!=rhs.rend(); ) {
     std::uint32_t _idx = 0, _value;
     auto v = *c;
 
     for (uint32_t _idx=0; _idx<(sizeof(std::uint32_t)*2); _idx++, c++) {
-      if (c == srhs.rend()) break;
+      if (c == rhs.rend()) break;
       v = *c;
       _value = ((v >= 'a') && (v <= 'f')) ?
         (v-'a'+10) :
@@ -100,6 +65,37 @@ svBitT<S>::svBitT(const char* rhs)
     /* */
     //std::cout << std::hex << Value[idx] << std::dec << "\n";
     idx++;
-    if (idx >= SV_CANONICAL_SIZE(S)) break;
+    if (idx >= SV_SIZE(S)) break;
   }
+
+  return *this;
+}
+
+template<std::uint32_t S>
+svBitTp<S>::operator uint64_t()
+{
+  uint64_t ret = 0;
+  if (SV_SIZE(S) > 1) {
+    ret = Value[1];
+    ret <<= (sizeof(svBitVec32)<<3);
+  }
+  ret |= Value[0];
+  return ret;
+}
+
+template<std::uint32_t S>
+svBitTp<S>& svBitTp<S>::operator=(const std::uint64_t rhs)
+{
+  Value[0] = rhs;
+  if (SV_SIZE(S) > 1) {
+    Value[1] = rhs >> 32;
+//    if (SV_SIZE(S) > 2) {
+//      Value[2] = rhs >> (32*2);
+//      if (SV_SIZE(S) > 3) {
+//        Value[3] = rhs >> (32*3);
+//      }
+//    }
+  }
+
+  return *this;
 }
