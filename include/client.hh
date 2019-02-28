@@ -45,6 +45,7 @@ public:
   void receive(char *);
   PipeConnector();
 };
+extern std::unique_ptr<PipeConnector> pipe0;
 
 //----------------------------------------------------------------------
 class Connection
@@ -70,7 +71,7 @@ public:
   }
 };
 
-extern Connection connection;
+extern std::unique_ptr<Connection> connection;
 
 class SocketClient
 {
@@ -85,6 +86,7 @@ public:
 
   void write(std::shared_ptr<TransBase> p)
   {
+    std::cout << "SocketClient::write id:" << std::hex << *(p->pipeId) << std::dec << " bytes:" << p->tranSz << "\n";
     io_service_.post(
         [this, p]()
         {
@@ -119,11 +121,12 @@ private:
   {
     boost::asio::async_read(socket_,
         boost::asio::buffer((void *)&pipeId, sizeof(pipeId)),
-        [this](boost::system::error_code ec, std::size_t /*length*/)
+        [this](boost::system::error_code ec, std::size_t length)
         {
-          auto tranSz = connection.getTranSz(pipeId);
+          auto tranSz = connection->getTranSz(pipeId);
+          std::cout << "SocketClient::do_read_header read:" << length << " bytes & tranSz:" << tranSz << "\n";
           if ((0 == ec) and (0 != tranSz)) {
-            do_read_body(connection.getPipe(pipeId));
+            do_read_body(connection->getPipe(pipeId));
           } else if (ec == boost::asio::error::eof) {
           } else {
             socket_.close();
@@ -135,10 +138,11 @@ private:
   {
     boost::asio::async_read(socket_,
        boost::asio::buffer(p->_recvdata.get(), p->tranSz),
-        [this, p](boost::system::error_code ec, std::size_t /*length*/)
+        [this, p](boost::system::error_code ec, std::size_t length)
         {
+          std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
           if (0 == ec) {
-            auto range=connection.pipes.equal_range(p->pipeId);
+            auto range=connection->pipes.equal_range(p->pipeId);
             for (auto it=range.first; it!=range.second; ++it) {
               it->second->receive(p->_recvdata.get());
             }
@@ -180,3 +184,6 @@ private:
   tcp::socket socket_;
   std::queue<std::shared_ptr<TransBase>> write_msgs_;
 };
+extern std::unique_ptr<SocketClient> sc;
+extern boost::asio::io_service io_service;
+extern "C" void ClientInit();

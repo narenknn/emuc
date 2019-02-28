@@ -39,6 +39,7 @@ public:
   { }
   void send(std::shared_ptr<TransBase> p)
   {
+    std::cout << "Sending pipeId:" << std::hex << PipeId << std::dec << "\n";
     *(p->pipeId) = PipeId;
     rawSend(p);
   }
@@ -52,33 +53,21 @@ EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 
 int main(int argc, char* argv[])
 {
-  try
-  {
-    if (argc != 3)
-    {
-      std::cerr << "Usage: SocketClient <host> <port>\n";
-      return 1;
-    }
-
-    boost::asio::io_service io_service;
-
-    tcp::resolver resolver(io_service);
-    auto endpoint_iterator = resolver.resolve({ argv[1], argv[2] });
-    SocketClient c(io_service, endpoint_iterator);
-
-    std::thread t([&io_service](){ io_service.run(); });
-
+  try {
+    ClientInit();
+    std::thread t([](){ io_service.run(); });
     std::shared_ptr<SdpReqBus> v1{std::make_shared<SdpReqBus>()};
+
     trans.send(v1);
 
     sleep(1);
 
-    c.close();
+    sc->close();
     t.join();
-  }
-  catch (std::exception& e)
-  {
+  } catch (std::exception& e) {
     std::cerr << "Exception: " << e.what() << "\n";
+  } catch (...) {
+    std::cerr << "Exception ocurred!!\n";
   }
 
   return 0;

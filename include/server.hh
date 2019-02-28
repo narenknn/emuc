@@ -49,9 +49,9 @@ public:
 class Connection
 {
 public:
-  std::multimap<std::uint32_t, Pipe *> pipes;
+  static std::multimap<std::uint32_t, Pipe *> pipes;
   std::unordered_map<std::uint32_t, std::uint32_t> sockPipes;
-  void addPipe(Pipe* p);
+  static void addPipe(Pipe* p);
   void addSockPipe(std::uint32_t pi, std::uint32_t sz);
   Pipe *getPipe(std::uint32_t pi) {
     auto it = pipes.find(pi);
@@ -68,13 +68,13 @@ public:
     return it->second->tranSz;
   }
 };
-
 extern Connection connection;
 
 //----------------------------------------------------------------------
 class SocketServer : public std::enable_shared_from_this<SocketServer>
 {
 public:
+  static std::queue<std::shared_ptr<TransBase>> write_msgs_pend;
   SocketServer(tcp::socket socket)
     : socket_(std::move(socket))
   {
@@ -88,6 +88,10 @@ public:
   void write(std::shared_ptr<TransBase> p)
   {
     bool write_in_progress = !write_msgs_.empty();
+    while (write_msgs_pend.size() > 0) {
+      write_msgs_.emplace(write_msgs_pend.front());
+      write_msgs_pend.pop();
+    }
     write_msgs_.emplace(p);
     if (!write_in_progress)
     {
@@ -196,3 +200,6 @@ private:
   tcp::acceptor acceptor_;
   tcp::socket socket_;
 };
+
+extern boost::asio::io_service io_service;
+extern "C" void ServerInit();

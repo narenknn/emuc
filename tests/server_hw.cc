@@ -48,18 +48,15 @@ public:
   }
 };
 
-boost::asio::io_service io_service;
-std::shared_ptr<Server> serverp;
 EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 
 int main(int argc, char* argv[])
 {
-  tcp::endpoint ep{tcp::v4(), 9001};
-  serverp = std::make_shared<Server>(io_service, ep);
-
   std::cout << "PipeId of trans: " << std::hex << CRC32_STR("abcd") << std::dec << "\n";
   std::shared_ptr<SdpReqBus> v0{std::make_shared<SdpReqBus>()};
-  trans.send(v0);
+  ServerInit();
+//  trans = std::make_unique<EmuTransactor<CRC32_STR("abcd"), SdpReqBus>>();
+//  trans->send(v0);
   io_service.run();
 
   return 0;

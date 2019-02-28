@@ -9,6 +9,7 @@
 //
 
 #include <queue>
+#include <vector>
 #include <iostream>
 #include <unordered_map>
 #include <boost/exception/all.hpp>
@@ -19,12 +20,11 @@
 #include "svbit.hh"
 #include "shash.hh"
 
-Connection connection;
+std::queue<std::shared_ptr<TransBase>> SocketServer::write_msgs_pend;
+std::multimap<std::uint32_t, Pipe *> Connection::pipes;
 std::shared_ptr<SocketServer> ss;
-
-namespace {
-  PipeConnector pipe0;
-}
+Connection    connection;
+PipeConnector pipe0;
 
 void
 Pipe::rawSend(std::shared_ptr<TransBase>& p)
@@ -32,11 +32,12 @@ Pipe::rawSend(std::shared_ptr<TransBase>& p)
   /* local send */
   auto range=connection.pipes.equal_range(pipeId);
   for (auto it=range.first; it!=range.second; ++it) {
-    it->second->receive(p->_data.get());
+    if (this != it->second)
+      it->second->receive(p->_data.get());
   }
   /* socket send */
   if (connection.sockPipes.end() != connection.sockPipes.find(pipeId)) {
-    if (ss) ss->write(p);
+    ss->write(p);
   }
 }
 
@@ -45,10 +46,7 @@ Pipe::Pipe(std::uint32_t p, std::uint32_t tz) :
   connection.addPipe(this);
 }
 
-/* Local connection sits in 'pipes'
-   All local-local connetion is put into localPipes;
-   All local-socket connetion is put into sockPipes;
-*/
+/* Local connection sits in 'pipes' */
 void
 Connection::addPipe(Pipe *p)
 {
@@ -60,7 +58,9 @@ Connection::addPipe(Pipe *p)
   *(trans->pipeId) = CRC32_STR("//connect//");
   std::memcpy(trans->getWrPtr()+sizeof(std::uint32_t), &(p->pipeId), sizeof(std::uint32_t));
   std::memcpy(trans->getWrPtr()+sizeof(std::uint32_t)+sizeof(std::uint32_t), &(p->tranSz), sizeof(std::uint32_t));
+  /* */
   if (ss) ss->write(trans);
+  else SocketServer::write_msgs_pend.emplace(trans);
 }
 void
 Connection::addSockPipe(std::uint32_t pi, std::uint32_t sz)
@@ -73,7 +73,6 @@ Connection::addSockPipe(std::uint32_t pi, std::uint32_t sz)
 PipeConnector::PipeConnector():
   Pipe{CRC32_STR("//connect//"),
     sizeof(std::uint32_t)+sizeof(std::uint32_t)} {
-  connection.addPipe(this);
 };
 
 void
@@ -83,5 +82,14 @@ PipeConnector::receive(char *d)
   std::memcpy(&pi, d, sizeof(pi));
   std::memcpy(&sz, d+sizeof(pi), sizeof(sz));
   /* add socket pipe */
+  std::cout << "PipeConnector::receive called pi:" << std::hex << pi << std::dec << " sz:" << sz << "\n";
   connection.addSockPipe(pi, sz);
+}
+
+boost::asio::io_service io_service;
+std::unique_ptr<Server> serverp {std::make_unique<Server>(io_service, tcp::endpoint{tcp::v4(), 9001})};
+
+extern "C" void
+ServerInit()
+{
 }
