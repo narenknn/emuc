@@ -61,9 +61,11 @@ private:
         [this](boost::system::error_code ec, std::size_t length)
         {
           std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
-          if ((0 == ec) and (0 != header.sizeOf)) {
-	    auto p = connection.getPipe(header);
-            if (0 != header.sizeOf) do_read_body(p);
+          if (0 == ec) {
+	    if (length == sizeof(header)) {
+	      auto p = connection.getPipe(header);
+	      if (0 != header.sizeOf) do_read_body(p);
+	    }
           } else if (ec == boost::asio::error::eof) {
           } else {
             std::cerr << "Error while Read Header ec(" << ec << "), sizeof(header)(" << sizeof(header) << ") size(" << header.sizeOf << ") length(" << length << ")\n";
@@ -101,7 +103,7 @@ private:
                            write_msgs_.front()->getWrPtrSz()),
         [this](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "Wrote length:" << length << "\n";
+          std::cout << "Wrote length:" << length << " pipeId:" << std::hex << write_msgs_.front()->header->pipeId << std::dec << " sizeof:" << write_msgs_.front()->header->sizeOf << "\n";
           if (!ec)
           {
             write_msgs_.pop();

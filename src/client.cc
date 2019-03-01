@@ -26,8 +26,7 @@ using SS = SocketClient;
 
 boost::asio::io_service io_service;
 tcp::resolver resolver(io_service);
-std::unique_ptr<SocketClient> ss
-{std::make_unique<SocketClient>
+std::unique_ptr<SocketClient> ss {std::make_unique<SocketClient>
     (io_service, resolver.resolve({"localhost", "9001"})) };
 
 extern "C" void

@@ -38,8 +38,7 @@ Connection::addPipe(Pipe *p)
   trans->header->pipeId = CRC32_STR("//connect//");
   std::memcpy(trans->getWrPtr()+sizeof(trans->header), &(p->pipeId), sizeof(std::uint32_t));
   std::memcpy(trans->getWrPtr()+sizeof(trans->header)+sizeof(std::uint32_t), &(p->tranSz), sizeof(std::uint32_t));
-  if (ss) ss->write(trans);
-  else SS::write_msgs_pend.emplace(trans);
+  p->send(trans);
 }
 
 PipeConnector::PipeConnector():

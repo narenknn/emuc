@@ -22,12 +22,15 @@ public:
   SdpReqBus(): TransBase{DATA_U8_SZ()},
     _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} {
   }
-  SdpReqBus(char *_d): TransBase{DATA_U8_SZ()},
-    _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} {
-      std::memcpy(_dptr, _d, DATA_U8_SZ());
-  }
-  SdpReqBus& operator=(SdpReqBus& o) {
+  SdpReqBus& operator=(const SdpReqBus& o) { /* copy assignment */
     std::memcpy(_dptr, o._dptr, DATA_U8_SZ());
+  }
+  SdpReqBus(const SdpReqBus& o):
+    TransBase(o),
+    _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} { /* copy constructor */
+  }
+  SdpReqBus(SdpReqBus&& o) noexcept : /* move constructor */
+    TransBase(o), _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} {
   }
 };
 

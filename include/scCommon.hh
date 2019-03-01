@@ -20,8 +20,15 @@ public:
   TransBase(std::uint32_t tsz) :
     tranSz(tsz), _data{std::make_unique<char[]>(tsz+sizeof(header))},
     header{(TransHeader *)_data.get()}
-  {
+  { }
+  TransBase(const TransBase& o) :
+    TransBase(o.tranSz) {
+    std::memcpy(_data.get(), o._data.get(), getWrPtrSz());
   }
+  TransBase(TransBase&& o) noexcept :
+    tranSz(o.tranSz), _data{std::move(o._data)},
+    header{(TransHeader *)_data.get()}
+  { }
 };
 
 //----------------------------------------------------------------------
