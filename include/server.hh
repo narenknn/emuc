@@ -6,70 +6,7 @@
 #error "Include either server.hh or client.hh!"
 #endif
 
-//----------------------------------------------------------------------
-using boost::asio::ip::tcp;
-class Connection;
-
-//----------------------------------------------------------------------
-class TransBase
-{
-public:
-  std::unique_ptr<char[]> _data;
-  std::uint32_t *pipeId;
-  std::uint32_t tranSz;
-  char *getWrPtr() { return _data.get(); }
-  std::uint32_t getWrPtrSz() { return sizeof(*pipeId) + tranSz; }
-  TransBase(std::uint32_t tsz) :
-    tranSz(tsz), _data{std::make_unique<char[]>(tsz+sizeof(*pipeId))},
-    pipeId((std::uint32_t *)(_data.get()))
-  {
-  }
-};
-
-//----------------------------------------------------------------------
-class Pipe
-{
-public:
-  const std::uint32_t pipeId, tranSz;
-  std::unique_ptr<char[]> _recvdata;
-
-  void rawSend(std::shared_ptr<TransBase>& p);
-  virtual void receive(char *) = 0;
-
-  Pipe(std::uint32_t p, std::uint32_t tz);
-};
-
-class PipeConnector : public Pipe
-{
-public:
-  void receive(char *);
-  PipeConnector();
-};
-
-class Connection
-{
-public:
-  static std::multimap<std::uint32_t, Pipe *> pipes;
-  std::unordered_map<std::uint32_t, std::uint32_t> sockPipes;
-  static void addPipe(Pipe* p);
-  void addSockPipe(std::uint32_t pi, std::uint32_t sz);
-  Pipe *getPipe(std::uint32_t pi) {
-    auto it = pipes.find(pi);
-    if (pipes.end() == it) {
-      BOOST_THROW_EXCEPTION(std::runtime_error("Invalid pipeId in getRecvPtr:" + std::to_string(pi)));
-    }
-    return it->second;
-  }
-  std::uint32_t getTranSz(std::uint32_t pipeId)
-  {
-    auto it = pipes.find(pipeId);
-    if (pipes.end() == it)
-      return 0;
-    return it->second->tranSz;
-  }
-};
-extern Connection connection;
-
+extern boost::asio::io_service io_service;
 //----------------------------------------------------------------------
 class SocketServer : public std::enable_shared_from_this<SocketServer>
 {
@@ -104,16 +41,16 @@ private:
   {
     auto self(shared_from_this());
     boost::asio::async_read(socket_,
-        boost::asio::buffer((void *)&pipeId, sizeof(pipeId)),
+        boost::asio::buffer((void *)&header, sizeof(header)),
         [this, self](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "pipeId obtained was :" << pipeId << " ec:" << ec << "\n";
-          auto tranSz = connection.getTranSz(pipeId);
-          if ((0 == ec) and (0 != tranSz)) {
-              do_read_body(connection.getPipe(pipeId));
+          std::cout << "SocketServer::do_read_header() pipeId obtained was :" << std::hex << header.pipeId << std::dec << " ec:" << ec << "\n";
+          if (0 == ec) {
+	    auto p = connection.getPipe(header);
+            if (0 != header.sizeOf) do_read_body(p);
           } else if (ec == boost::asio::error::eof) {
           } else {
-            std::cerr << "Error while Read Header ec(" << ec << "), sizeof(pipeId)(" << sizeof(pipeId) << ") size(" << tranSz << ") length(" << length << ")\n";
+            std::cerr << "Error while Read Header ec(" << ec << "), sizeof(pipeId)(" << sizeof(header.pipeId) << ") size(" << header.sizeOf << ") length(" << length << ")\n";
           }
         });
   }
@@ -124,17 +61,18 @@ private:
     boost::asio::async_read
       (socket_,
        boost::asio::buffer(p->_recvdata.get(), p->tranSz),
-       [this, self, p](boost::system::error_code ec, std::size_t /*length*/)
+       [this, self, p](boost::system::error_code ec, std::size_t length)
        {
+	 std::cout << "SocketServer::do_read_body() ec:" << ec << " length:" << length << "\n";
          if (0 == ec) {
            auto range=connection.pipes.equal_range(p->pipeId);
            for (auto it=range.first; it!=range.second; ++it) {
-             it->second->receive(p->_recvdata.get());
+             it->second->receive(p->_recvdata.get()+sizeof(p->pipeId));
            }
            do_read_header();
          } else if (ec == boost::asio::error::eof) {
          } else {
-           std::cerr << "Error while Read Body ec(" << ec << "), pipeId(" << pipeId << ")\n";
+           std::cerr << "Error while Read Body ec(" << ec << "), pipeId(" << p->pipeId << ")\n";
          }
        });
   }
@@ -158,12 +96,12 @@ private:
           }
           else
           {
-            std::cerr << "Error while Write Body ec(" << ec << "), pipeId(" << pipeId << ")\n";
+            std::cerr << "Error while Write Body ec(" << ec << "), pipeId(" << write_msgs_.front()->header->pipeId << ")\n";
           }
         });
   }
 
-  std::uint32_t pipeId;
+  TransHeader header;
   tcp::socket socket_;
   std::queue<std::shared_ptr<TransBase>> write_msgs_;
 };
@@ -200,6 +138,7 @@ private:
   tcp::acceptor acceptor_;
   tcp::socket socket_;
 };
+
 
 extern boost::asio::io_service io_service;
 extern "C" void ServerInit();

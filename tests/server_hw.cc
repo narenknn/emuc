@@ -2,6 +2,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <boost/asio.hpp>
+#include "scCommon.hh"
 #include "server.hh"
 
 #include <cstring>
@@ -19,32 +20,14 @@ public:
   static constexpr std::size_t
   DATA_U8_SZ() { return DATA_U32_SZ()*sizeof(std::uint32_t); }
   SdpReqBus(): TransBase{DATA_U8_SZ()},
-    _dptr{(std::uint32_t*)(((char *)_data.get())+sizeof(*pipeId))} {
+    _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} {
   }
   SdpReqBus(char *_d): TransBase{DATA_U8_SZ()},
-    _dptr{(std::uint32_t*)(((char *)_data.get())+sizeof(*pipeId))} {
+    _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} {
       std::memcpy(_dptr, _d, DATA_U8_SZ());
   }
   SdpReqBus& operator=(SdpReqBus& o) {
     std::memcpy(_dptr, o._dptr, DATA_U8_SZ());
-  }
-};
-
-template<std::uint32_t PipeId, class Bus>
-class EmuTransactor : public Pipe
-{
-public:
-  EmuTransactor() : Pipe{PipeId, Bus::DATA_U8_SZ()}
-  { }
-  void send(std::shared_ptr<TransBase> p)
-  {
-    *(p->pipeId) = PipeId;
-    rawSend(p);
-  }
-  void receive(char *)
-  {
-    //Bus{_recvdata.get()};
-    std::cout << "Server Obtained transaction\n";
   }
 };
 
