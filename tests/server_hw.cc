@@ -38,12 +38,20 @@ EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 
 int main(int argc, char* argv[])
 {
-  std::cout << "PipeId of trans: " << std::hex << CRC32_STR("abcd") << std::dec << "\n";
+  ss = std::make_shared<SocketServer>();
+  //std::cout << "PipeId of EmuTransactor:abcd:" << std::hex << CRC32_STR("abcd") << std::dec << "\n";
   std::shared_ptr<SdpReqBus> v0{std::make_shared<SdpReqBus>()};
-  ServerInit();
-//  trans = std::make_unique<EmuTransactor<CRC32_STR("abcd"), SdpReqBus>>();
-//  trans->send(v0);
-  io_service.run();
+  v0->addr = 0xABCD;
+  v0->data = 0xABC5;
+  trans.send(v0);
+  trans.send(v0);
+  trans.send(v0);
+
+  while (true) {
+    //  for (auto i=0; i<1000; i++) {
+    sleep(0.01);
+    pollOnce();
+  }
 
   return 0;
 }

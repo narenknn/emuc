@@ -30,6 +30,8 @@ std::unique_ptr<SocketClient> ss {std::make_unique<SocketClient>
     (io_service, resolver.resolve({"localhost", "9001"})) };
 
 extern "C" void
-ClientInit()
+pollOnce()
 {
+  if (ss) ss->serviceLoop();
+  io_service.poll();
 }

@@ -40,16 +40,17 @@ EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 int main(int argc, char* argv[])
 {
   try {
-    ClientInit();
     std::shared_ptr<SdpReqBus> v1{std::make_shared<SdpReqBus>()};
-
+    v1->addr = 0xABCD;
+    v1->data = 0xABCC;
     trans.send(v1);
-    std::cout << "v1.. pipeId:" << std::hex << v1->header->pipeId << std::dec << " sizeOf:" << v1->header->sizeOf << "\n";
+    //std::cout << "v1.. pipeId:" << std::hex << v1->header->pipeId << std::dec << " sizeOf:" << v1->header->sizeOf << "\n";
 
-    sleep(1);
-
-    io_service.run();
-
+    while (true) {
+      //    for (auto i=0; i<1000; i++) {
+      sleep(0.01);
+      pollOnce();
+    }
     ss->close();
   } catch (std::exception& e) {
     std::cerr << "Exception: " << e.what() << "\n";

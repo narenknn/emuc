@@ -6,10 +6,11 @@
 #error "Include either server.hh or client.hh!"
 #endif
 
+extern std::queue<std::shared_ptr<TransBase>> _write_msgs_pend;
 class SocketClient
 {
 public:
-  static std::queue<std::shared_ptr<TransBase>> write_msgs_pend;
+  bool write_in_progress{false};
   SocketClient(boost::asio::io_service& io_service,
 	       tcp::resolver::iterator endpoint_iterator):
     io_service_(io_service), socket_(io_service)
@@ -19,21 +20,32 @@ public:
 
   void write(std::shared_ptr<TransBase> p)
   {
-    std::cout << "SocketClient::write id:" << std::hex << p->header->pipeId << std::dec << " bytes:" << p->tranSz << " vs bytes-in-header:" << p->header->sizeOf << "\n";
+    //std::cout << "SocketClient::write id:" << std::hex << p->header->pipeId << std::dec << " bytes:" << p->tranSz << " vs bytes-in-header:" << p->header->sizeOf << "\n";
     io_service_.post(
         [this, p]()
         {
-          bool write_in_progress = !write_msgs_.empty();
-	  while (write_msgs_pend.size() > 0) {
-	    write_msgs_.emplace(write_msgs_pend.front());
-	    write_msgs_pend.pop();
+	  while (_write_msgs_pend.size() > 0) {
+	    write_msgs_.emplace(_write_msgs_pend.front());
+	    _write_msgs_pend.pop();
 	  }
           write_msgs_.emplace(p);
-          if (!write_in_progress)
+          if (not write_in_progress)
           {
             do_write();
           }
         });
+  }
+
+  void serviceLoop()
+  {
+    while (_write_msgs_pend.size() > 0) {
+      write_msgs_.emplace(_write_msgs_pend.front());
+      _write_msgs_pend.pop();
+    }
+    if (not write_in_progress and not write_msgs_.empty()) {
+      do_write();
+    }
+    //for (auto it: _pipes) { std::cout << "serviceLoop():_pipes got pipeId:" << std::hex << it.first << std::dec << "\n"; }
   }
 
   void close()
@@ -60,7 +72,7 @@ private:
         boost::asio::buffer((void *)&header, sizeof(header)),
         [this](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
+          //std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
           if (0 == ec) {
 	    if (length == sizeof(header)) {
 	      auto p = connection.getPipe(header);
@@ -80,9 +92,9 @@ private:
        boost::asio::buffer(p->_recvdata.get(), p->tranSz),
         [this, p](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
+          //std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
           if (0 == ec) {
-            auto range=connection.pipes.equal_range(p->pipeId);
+            auto range=_pipes.equal_range(p->pipeId);
             for (auto it=range.first; it!=range.second; ++it) {
               it->second->receive(p->_recvdata.get()+sizeof(p->pipeId));
             }
@@ -97,13 +109,15 @@ private:
 
   void do_write()
   {
+    write_in_progress = true;
     boost::asio::async_write
       (socket_,
        boost::asio::buffer(write_msgs_.front()->getWrPtr(),
                            write_msgs_.front()->getWrPtrSz()),
         [this](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "Wrote length:" << length << " pipeId:" << std::hex << write_msgs_.front()->header->pipeId << std::dec << " sizeof:" << write_msgs_.front()->header->sizeOf << "\n";
+          //std::cout << "Wrote length:" << length << " pipeId:" << std::hex << write_msgs_.front()->header->pipeId << std::dec << " sizeof:" << write_msgs_.front()->header->sizeOf << "\n";
+	  write_in_progress = false;
           if (!ec)
           {
             write_msgs_.pop();
@@ -128,4 +142,4 @@ private:
 
 extern boost::asio::io_service io_service;
 extern std::unique_ptr<SocketClient> ss;
-extern "C" void ClientInit();
+extern "C" void pollOnce();

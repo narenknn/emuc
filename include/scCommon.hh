@@ -34,18 +34,13 @@ public:
 //----------------------------------------------------------------------
 class Pipe
 {
+  void rawSend(std::shared_ptr<TransBase>& p);
 public:
   const std::uint32_t pipeId, tranSz;
   std::unique_ptr<char[]> _recvdata;
+  bool isConnected{false};
 
-  void rawSend(std::shared_ptr<TransBase>& p);
-  virtual void send(std::shared_ptr<TransBase> p)
-  {
-    std::cout << "Sending pipeId:" << std::hex << pipeId << std::dec << "\n";
-    p->header->pipeId = pipeId;
-    p->header->sizeOf = p->tranSz;
-    rawSend(p);
-  }
+  virtual void send(std::shared_ptr<TransBase> p);
   virtual void receive(char *) = 0;
 
   Pipe(std::uint32_t p, std::uint32_t tz);
@@ -68,20 +63,23 @@ public:
 extern PipeConnector pipe0;
 
 //----------------------------------------------------------------------
+extern std::multimap<std::uint32_t, Pipe *> _pipes;
+extern std::map<std::uint32_t, std::unique_ptr<UnusedPipe>> _unused_pipes;
 class Connection
 {
 public:
-  static std::multimap<std::uint32_t, Pipe *> pipes;
-  static std::map<std::uint32_t, std::unique_ptr<UnusedPipe>> unused_pipes;
   static void addPipe(Pipe* p);
   Pipe *getPipe(const TransHeader& header) {
-    auto it = pipes.find(header.pipeId);
-    if (pipes.end() != it)
-      return it->second;
+    auto it = _pipes.find(header.pipeId);
+    //std::cout << "getPipe for id:" << std::hex << header.pipeId << std::dec << ((_pipes.end() == it) ? " not found" : " found") << "\n";
+    //for (auto it: _pipes) { std::cout << "_pipes got pipeId:" << std::hex << it.first << std::dec << "\n"; }
+    if (_pipes.end() != it) return it->second;
     /* create a new unused pipe */
-    if (unused_pipes.end() == unused_pipes.find(header.pipeId))
-      unused_pipes.emplace(header.pipeId, std::make_unique<UnusedPipe>(header.pipeId, header.sizeOf));
-    return unused_pipes[header.pipeId].get();
+    if (_unused_pipes.end() == _unused_pipes.find(header.pipeId)) {
+      //std::cout << "Creating _unused_pipes for pipeId:" << std::hex << header.pipeId << std::dec << "\n";
+      _unused_pipes.emplace(header.pipeId, std::make_unique<UnusedPipe>(header.pipeId, header.sizeOf));
+    }
+    return _unused_pipes[header.pipeId].get();
   }
 };
 extern Connection connection;
