@@ -23,6 +23,9 @@ public:
   SdpReqBus(): TransBase{DATA_U8_SZ()},
     _dptr{(std::uint32_t*)(_data.get()+sizeof(TransHeader))} {
   }
+  SdpReqBus(char *d): SdpReqBus() {
+    std::memcpy(_dptr, d, DATA_U8_SZ());
+  }
   SdpReqBus& operator=(const SdpReqBus& o) { /* copy assignment */
     std::memcpy(_dptr, o._dptr, DATA_U8_SZ());
   }
@@ -35,6 +38,19 @@ public:
   }
 };
 
+//----------------------------------------------------------------------
+template<std::uint32_t PipeId, class Bus>
+class EmuTransactor : public Pipe
+{
+public:
+  EmuTransactor() : Pipe{PipeId, Bus::DATA_U8_SZ()}
+  { }
+  void receive(char *d)
+  {
+    Bus b{d};
+    std::cout << "EmuTransactor Obtained transaction addr:" << std::string(b.addr) << " data:" << std::string(b.data) << "\n";
+  }
+};
 EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 
 int main(int argc, char* argv[])
@@ -45,6 +61,7 @@ int main(int argc, char* argv[])
     std::shared_ptr<SdpReqBus> v1{std::make_shared<SdpReqBus>()};
     v1->addr = 0xABCD;
     v1->data = 0xABCC;
+    std::cout << "Sending addr:" << std::string(v1->addr) << " data:" << std::string(v1->data) << "\n";
     trans.send(v1);
     //std::cout << "v1.. pipeId:" << std::hex << v1->header->pipeId << std::dec << " sizeOf:" << v1->header->sizeOf << "\n";
 

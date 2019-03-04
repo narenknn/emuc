@@ -72,9 +72,6 @@ PipeConnector::PipeConnector():
 void
 PipeConnector::receive(char *d)
 {
-  std::uint32_t pi, sz;
-  std::memcpy(&pi, d, sizeof(pi));
-  std::memcpy(&sz, d+sizeof(pi), sizeof(sz));
   /* add socket pipe */
-  std::cout << "PipeConnector::receive called pi:" << std::hex << pi << std::dec << " sz:" << sz << "\n";
+  //std::cout << "PipeConnector::receive called pi:" << std::hex << pipeId << std::dec << " sz:" << tranSz << "\n";
 }

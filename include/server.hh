@@ -44,7 +44,7 @@ public:
       write_msgs_.emplace(_write_msgs_pend.front());
       _write_msgs_pend.pop();
     }
-    std::cout << "serviceLoop isConnected:" << (isConnected?"true":"false") << " write_in_progress:" << (write_in_progress?"true":"false") << "\n";
+    //std::cout << "serviceLoop isConnected:" << (isConnected?"true":"false") << " write_in_progress:" << (write_in_progress?"true":"false") << "\n";
     if (isConnected and not write_in_progress and not write_msgs_.empty()) {
       do_write();
     }
@@ -75,16 +75,16 @@ private:
   void do_read_body(Pipe *p)
   {
     auto self(shared_from_this());
+    std::memcpy(p->_recvdata.get(), &header, sizeof(header));
     boost::asio::async_read
-      (socket_,
-       boost::asio::buffer(p->_recvdata.get(), p->tranSz),
+		(socket_, boost::asio::buffer(p->_recvdata.get()+sizeof(header), p->tranSz),
        [this, self, p](boost::system::error_code ec, std::size_t length)
        {
 	 //std::cout << "SocketServer::do_read_body() ec:" << ec << " length:" << length << "\n";
          if (0 == ec) {
            auto range=_pipes.equal_range(p->pipeId);
            for (auto it=range.first; it!=range.second; ++it) {
-             it->second->receive(p->_recvdata.get()+sizeof(p->pipeId));
+	     it->second->receive(p->_recvdata.get());
            }
            do_read_header();
          } else if (ec == boost::asio::error::eof) {
@@ -98,7 +98,7 @@ private:
   {
     auto self(shared_from_this());
     write_in_progress = true;
-    std::cout << "SocketServer::do_write() called\n";
+    //std::cout << "SocketServer::do_write() called\n";
     boost::asio::async_write
       (socket_,
        boost::asio::buffer(write_msgs_.front()->getWrPtr(),

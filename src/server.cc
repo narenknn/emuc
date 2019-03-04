@@ -31,7 +31,6 @@ std::shared_ptr<SocketServer> ss;
 extern "C" void
 pollOnce()
 {
-  std::cout << "pollOnce called\n";
   if (ss) ss->serviceLoop();
   io_service.poll();
 }

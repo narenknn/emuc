@@ -12,8 +12,8 @@ public:
   svBitTp(svBitVec32 *v) : Value(v) {}
 
   /* Type conversions */
-  operator uint64_t();
-  operator std::string();
+  operator uint64_t() const;
+  operator std::string() const;
 
   svBitTp<S>& operator=(const svBitTp<S> &o) {
     std::memcpy(Value, o.Value, SV_SIZE(S)*sizeof(std::uint32_t));
@@ -24,7 +24,7 @@ public:
 };
 
 template<std::uint32_t S>
-svBitTp<S>::operator std::string()
+svBitTp<S>::operator std::string() const
 {
   static const char int2hex[] {"0123456789ABCDEF"};
   std::string ret;
@@ -72,7 +72,7 @@ svBitTp<S>& svBitTp<S>::operator=(const std::string& rhs)
 }
 
 template<std::uint32_t S>
-svBitTp<S>::operator uint64_t()
+svBitTp<S>::operator uint64_t() const
 {
   uint64_t ret = 0;
   if (SV_SIZE(S) > 1) {

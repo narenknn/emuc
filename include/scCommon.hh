@@ -84,17 +84,3 @@ public:
   }
 };
 extern Connection connection;
-
-//----------------------------------------------------------------------
-template<std::uint32_t PipeId, class Bus>
-class EmuTransactor : public Pipe
-{
-public:
-  EmuTransactor() : Pipe{PipeId, Bus::DATA_U8_SZ()}
-  { }
-  void receive(char *)
-  {
-    //Bus{_recvdata.get()};
-    std::cout << "EmuTransactor Obtained transaction\n";
-  }
-};

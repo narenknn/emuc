@@ -72,7 +72,7 @@ private:
         boost::asio::buffer((void *)&header, sizeof(header)),
         [this](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
+          //std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
           if (0 == ec) {
 	    if (length == sizeof(header)) {
 	      auto p = connection.getPipe(header);
@@ -88,15 +88,16 @@ private:
 
   void do_read_body(Pipe *p)
   {
-    boost::asio::async_read(socket_,
-       boost::asio::buffer(p->_recvdata.get(), p->tranSz),
+    std::memcpy(p->_recvdata.get(), &header, sizeof(header));
+    boost::asio::async_read
+		(socket_, boost::asio::buffer(p->_recvdata.get()+sizeof(header), p->tranSz),
         [this, p](boost::system::error_code ec, std::size_t length)
         {
-          std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
+          //std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
           if (0 == ec) {
             auto range=_pipes.equal_range(p->pipeId);
             for (auto it=range.first; it!=range.second; ++it) {
-              it->second->receive(p->_recvdata.get()+sizeof(p->pipeId));
+              it->second->receive(p->_recvdata.get());
             }
             do_read_header();
           } else if (ec == boost::asio::error::eof) {
