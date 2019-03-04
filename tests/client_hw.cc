@@ -40,6 +40,8 @@ EmuTransactor<CRC32_STR("abcd"), SdpReqBus> trans;
 int main(int argc, char* argv[])
 {
   try {
+    pollInit();
+    trans.connect();
     std::shared_ptr<SdpReqBus> v1{std::make_shared<SdpReqBus>()};
     v1->addr = 0xABCD;
     v1->data = 0xABCC;

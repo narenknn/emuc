@@ -25,8 +25,8 @@ void
 Pipe::send(std::shared_ptr<TransBase> p)
 {
   if (not isConnected) {
-    Connection::addPipe(this);
-    isConnected = true;
+    std::cerr << "Attempt to send in Pipe (" << std::hex << pipeId << std::dec << ") that is not yet connected..\n";
+    return;
   }
   //std::cout << "Sending pipeId:" << std::hex << pipeId << std::dec << " sizeOf:" << p->tranSz << "\n";
   p->header->pipeId = pipeId;
@@ -34,9 +34,15 @@ Pipe::send(std::shared_ptr<TransBase> p)
   rawSend(p);
 }
 
-
 Pipe::Pipe(std::uint32_t p, std::uint32_t tz) :
   pipeId(p), tranSz(tz), _recvdata{std::make_unique<char[]>(tz)} {
+}
+
+void
+Pipe::connect()
+{
+  isConnected = true;
+  Connection::addPipe(this);
 }
 
 /* Local connection sits in 'pipes' */
@@ -51,11 +57,11 @@ Connection::addPipe(Pipe *p)
   //std::cout << "addPipe called for (" << p << ") pipeId:" << std::hex << p->pipeId << std::dec << "\n";
   /* tell to other end of this pipe */
   auto trans = std::make_shared<TransBase>(sizeof(std::uint32_t)+sizeof(std::uint32_t));
-  //trans->header->pipeId = CRC32_STR("//connect//");
-  //trans->header->sizeOf = sizeof(std::uint32_t)+sizeof(std::uint32_t);
+  trans->header->pipeId = CRC32_STR("//connect//");
+  trans->header->sizeOf = sizeof(std::uint32_t)+sizeof(std::uint32_t);
   std::memcpy(trans->getWrPtr()+sizeof(trans->header), &(p->pipeId), sizeof(std::uint32_t));
   std::memcpy(trans->getWrPtr()+sizeof(trans->header)+sizeof(std::uint32_t), &(p->tranSz), sizeof(std::uint32_t));
-  p->send(trans);
+  p->rawSend(trans);
 }
 
 PipeConnector::PipeConnector():

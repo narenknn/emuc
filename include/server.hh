@@ -6,17 +6,16 @@
 #error "Include either server.hh or client.hh!"
 #endif
 
-extern boost::asio::io_service io_service;
 extern std::queue<std::shared_ptr<TransBase>> _write_msgs_pend;
 extern boost::asio::io_service io_service;
-extern tcp::socket socket_;
 
 //----------------------------------------------------------------------
 class SocketServer : public std::enable_shared_from_this<SocketServer>
 {
 public:
   bool write_in_progress{false}, isConnected{false};
-  SocketServer()
+  SocketServer(tcp::socket socket)
+    : socket_(std::move(socket))
   {
   }
 
@@ -45,6 +44,7 @@ public:
       write_msgs_.emplace(_write_msgs_pend.front());
       _write_msgs_pend.pop();
     }
+    std::cout << "serviceLoop isConnected:" << (isConnected?"true":"false") << " write_in_progress:" << (write_in_progress?"true":"false") << "\n";
     if (isConnected and not write_in_progress and not write_msgs_.empty()) {
       do_write();
     }
@@ -98,13 +98,14 @@ private:
   {
     auto self(shared_from_this());
     write_in_progress = true;
+    std::cout << "SocketServer::do_write() called\n";
     boost::asio::async_write
       (socket_,
        boost::asio::buffer(write_msgs_.front()->getWrPtr(),
                            write_msgs_.front()->getWrPtrSz()),
         [this, self](boost::system::error_code ec, std::size_t length)
         {
-          //std::cout << "Wrote length:" << length << " pipeId:" << std::hex << write_msgs_.front()->header->pipeId << std::dec << " sizeof:" << write_msgs_.front()->header->sizeOf << "\n";
+          std::cout << "Wrote length:" << length << " pipeId:" << std::hex << write_msgs_.front()->header->pipeId << std::dec << " sizeof:" << write_msgs_.front()->header->sizeOf << "\n";
 	  write_in_progress = false;
           if (!ec)
           {
@@ -122,6 +123,7 @@ private:
   }
 
   TransHeader header;
+  tcp::socket socket_;
   std::queue<std::shared_ptr<TransBase>> write_msgs_;
 };
 extern std::shared_ptr<SocketServer> ss;
@@ -130,9 +132,10 @@ extern std::shared_ptr<SocketServer> ss;
 class Server
 {
 public:
-  Server(boost::asio::io_service& io_service,
+  Server(boost::asio::io_service& io_s,
       const tcp::endpoint& endpoint)
-    : acceptor_(io_service, endpoint)
+    : acceptor_(io_s, endpoint),
+      socket_(io_service)
   {
     do_accept();
   }
@@ -145,6 +148,7 @@ private:
         {
           if (!ec)
           {
+            ss = std::make_shared<SocketServer>(std::move(socket_));
             ss->start();
           }
 
@@ -152,7 +156,9 @@ private:
         });
   }
 
+  tcp::socket socket_;
   tcp::acceptor acceptor_;
 };
 
 extern "C" void pollOnce();
+extern "C" void pollInit();

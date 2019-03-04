@@ -34,14 +34,15 @@ public:
 //----------------------------------------------------------------------
 class Pipe
 {
-  void rawSend(std::shared_ptr<TransBase>& p);
 public:
   const std::uint32_t pipeId, tranSz;
   std::unique_ptr<char[]> _recvdata;
   bool isConnected{false};
 
+  void rawSend(std::shared_ptr<TransBase>& p);
   virtual void send(std::shared_ptr<TransBase> p);
   virtual void receive(char *) = 0;
+  void connect();
 
   Pipe(std::uint32_t p, std::uint32_t tz);
 };
@@ -94,6 +95,6 @@ public:
   void receive(char *)
   {
     //Bus{_recvdata.get()};
-    std::cout << "Client Obtained transaction\n";
+    std::cout << "EmuTransactor Obtained transaction\n";
   }
 };

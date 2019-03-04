@@ -72,7 +72,7 @@ private:
         boost::asio::buffer((void *)&header, sizeof(header)),
         [this](boost::system::error_code ec, std::size_t length)
         {
-          //std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
+          std::cout << "SocketClient::do_read_header PipeId:" << std::hex << header.pipeId << std::dec << " read:" << length << " bytes & sizeOf:" << header.sizeOf << "\n";
           if (0 == ec) {
 	    if (length == sizeof(header)) {
 	      auto p = connection.getPipe(header);
@@ -92,7 +92,7 @@ private:
        boost::asio::buffer(p->_recvdata.get(), p->tranSz),
         [this, p](boost::system::error_code ec, std::size_t length)
         {
-          //std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
+          std::cout << "SocketClient::do_read_body bytes:" << length << "\n";
           if (0 == ec) {
             auto range=_pipes.equal_range(p->pipeId);
             for (auto it=range.first; it!=range.second; ++it) {
@@ -143,3 +143,4 @@ private:
 extern boost::asio::io_service io_service;
 extern std::unique_ptr<SocketClient> ss;
 extern "C" void pollOnce();
+extern "C" void pollInit();

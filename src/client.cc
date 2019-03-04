@@ -35,3 +35,9 @@ pollOnce()
   if (ss) ss->serviceLoop();
   io_service.poll();
 }
+
+extern "C" void
+pollInit()
+{
+  pipe0.connect();
+}
